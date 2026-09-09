@@ -1,0 +1,61 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+    paths-ignore:
+      # Ignore documentation changes
+      - '**.md'
+      - '**.png'
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install required rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-unknown-linux-gnu
+        override: true
+        components: rustfmt, clippy
+
+    - name: Build
+      run: make
+
+    - name: Install test deps
+      run: |
+        sudo apt-get update
+        # Virtualization deps
+        sudo apt-get install -y qemu-system-x86-64 qemu-guest-agent qemu-utils ovmf
+
+    - name: Cache test assets
+      uses: actions/cache@v3
+      with:
+        path: tests/.assets
+        key: ${{ hashFiles('Makefile') }}-${{ hashFiles('tests/images/*') }}-${{ hashFiles('tests/kernels/*') }}-assets
+
+    - name: Enable KVM group perms
+      run: |
+        # Only configure kvm perms if kvm is available
+        if [[ -e /dev/kvm ]]; then
+          echo "Updating KVM permissions"
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+        fi
+
+    - name: Run integration tests
+      run: make test
+
+    - name: Run rustfmt
+      run: cargo fmt --check
