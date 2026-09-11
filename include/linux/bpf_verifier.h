@@ -805,6 +805,7 @@ struct bpf_subprog_info {
 	u32 linfo_idx; /* The idx to the main_prog->aux->linfo */
 	u32 postorder_start; /* The idx to the env->cfg.insn_postorder */
 	u32 exit_idx; /* Index of one of the BPF_EXIT instructions in this subprogram */
+	struct bpf_iarray *jt; /* jump table shared by all gotox of this subprogram */
 	u16 stack_depth; /* max. stack depth used by this function */
 	u16 stack_extra;
 	u32 insns_total;
@@ -825,6 +826,7 @@ struct bpf_subprog_info {
 	bool keep_fastcall_stack: 1;
 	bool changes_pkt_data: 1;
 	bool might_sleep: 1;
+	bool jt_spans_subprogs: 1;
 	u8 arg_cnt:4;
 
 	enum priv_stack_mode priv_stack_mode;
@@ -977,6 +979,8 @@ struct bpf_verifier_env {
 		int cur_stack;
 		/* current position in the insn_postorder vector */
 		int cur_postorder;
+		u32 gotox_edges;
+		bool subprog_jts_ready;
 	} cfg;
 	struct backtrack_state bt;
 	struct bpf_jmp_history_entry *cur_hist_ent;
